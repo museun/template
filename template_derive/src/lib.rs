@@ -1,6 +1,7 @@
+use heck::SnekCase as _;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::*;
+use syn::{parse_macro_input, DeriveInput};
 
 /** Derives `Template` for an enum
 
@@ -53,25 +54,26 @@ pub fn template(input: TokenStream) -> TokenStream {
         let name = var.to_string().to_snek_case();
         quote! { #var { .. } => #name }
     });
-
-    use heck::SnekCase as _;
     let name = ident.to_string().to_snek_case();
     let namespace = namespace.to_snek_case();
 
     let ast = quote! {
         impl #generics Template for #ident #generics {
             fn namespace() -> &'static str { #namespace }
+
             fn name() -> &'static str { #name }
+
             fn variant(&self) -> &'static str {
                 use #ident::*;
                 match self {
                     #(#names),*
                 }
             }
+
             fn apply(&self, template: &str) -> Option<String> {
                 use #ident::*;
                 match self {
-                     #(#matches),*
+                    #(#matches),*
                 }
             }
         }

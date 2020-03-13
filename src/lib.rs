@@ -6,11 +6,33 @@
     missing_copy_implementations,
     trivial_casts,
     trivial_numeric_casts,
+    dead_code,
     unsafe_code,
     unstable_features,
     unused_import_braces,
     unused_qualifications
 )]
+
+#[doc(inline)]
+pub use markings;
+
+mod mapping;
+pub use mapping::Mapping;
+
+mod templates;
+pub use templates::Templates;
+
+mod error;
+pub use error::Error;
+
+mod store;
+pub use store::{FileStore, MemoryStore, PartialStore, TemplateStore};
+
+mod loader;
+pub use loader::*;
+
+/// A template mapping of `T` to `Mapping<T>`
+pub type TemplateMap<T> = std::collections::HashMap<T, Mapping<T>>;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "derive")] {
@@ -21,9 +43,6 @@ cfg_if::cfg_if! {
         pub use template_derive::*;
     }
 }
-
-#[doc(inline)]
-pub use markings;
 
 /// Template for applying a templated string to an enum variant
 pub trait Template {
@@ -37,49 +56,61 @@ pub trait Template {
     fn apply(&self, input: &str) -> Option<String>;
 }
 
-mod mapping;
-pub use mapping::Mapping;
-
-mod templates;
-pub use templates::Templates;
-
-mod error;
-pub use error::Error;
-
-mod store;
-pub use store::{FileStore, MemoryStore, TemplateStore};
-
-// TODO make this less confusing
-static_assertions::assert_cfg!(
-    not(all(feature = "serde_json", feature = "toml")),
-    "a single `serde_json` or `toml` feature must be chosen"
-);
-
-static_assertions::assert_cfg!(
-    not(all(not(feature = "serde_json"), not(feature = "toml"))),
-    "the feature `serde_json` or `toml` must be chosen"
-);
-
-impl<T> TemplateStore for Box<T>
+/// A Template Resolver
+///
+/// Provides a simple way to always get the latest template string for a `namespace.name`
+#[derive(Debug)]
+pub struct Resolver<S>
 where
-    T: TemplateStore,
+    S: TemplateStore,
 {
-    fn data(&mut self) -> std::io::Result<String> {
-        <T as TemplateStore>::data(&mut *self)
+    templates: Templates<S>,
+}
+
+impl<S: TemplateStore> Resolver<S> {
+    /// Create a new resolver using this `TemplateStore`
+    ///
+    /// # Errors
+    /// - Failure to load/parse the initial templates
+    pub fn new(store: S) -> Result<Self, Error> {
+        Templates::new(store).map(|templates| Self { templates })
     }
-    fn changed(&mut self) -> bool {
-        <T as TemplateStore>::changed(&mut *self)
+
+    /// Tries to get the template string for `namespace.name`
+    pub fn resolve(&mut self, namespace: &str, name: &str) -> Option<&String> {
+        self.templates.refresh().ok()?;
+        self.templates.get(namespace)?.get(name)
+    }
+
+    /// Get a reference to the inner store
+    pub fn store(&self) -> &S {
+        self.templates.store()
+    }
+
+    /// Get a mutable reference to the inner store
+    pub fn store_mut(&mut self) -> &mut S {
+        self.templates.store_mut()
     }
 }
 
-// TODO unit tests
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn boxed_template_store() {
-        let mut store: Box<dyn TemplateStore> = Box::new(MemoryStore::new("[foo] bar = ${baz}"));
-        let _ = store.data();
-        let _ = store.changed();
-    }
+/// Simple constructor for creating a `PartialStore` from two `MemoryStore`s
+pub fn partial_memory_store(
+    default: impl Into<String>,
+    partial: impl Into<String>,
+    loader: LoadFunction,
+) -> PartialStore<MemoryStore, MemoryStore> {
+    let default = MemoryStore::new(default, loader);
+    let partial = MemoryStore::new(partial, loader);
+    PartialStore::new(default, partial)
+}
+
+/// Simple constructor for creating a `PartialStore` using `FileStore`s
+pub fn partial_file_store(
+    default: impl Into<std::path::PathBuf>,
+    partial: impl Into<std::path::PathBuf>,
+    loader: LoadFunction,
+) -> Result<PartialStore<FileStore, FileStore>, Error> {
+    let default = FileStore::new(default.into(), loader)?;
+    let partial = FileStore::new(partial.into(), loader)?;
+    Ok(PartialStore::new(default, partial))
 }

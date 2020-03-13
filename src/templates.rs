@@ -2,9 +2,7 @@ use std::borrow::Borrow;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use super::{Error, Mapping, TemplateStore};
-
-type TemplateMap<T> = std::collections::HashMap<T, Mapping<T>>;
+use super::{Error, Mapping, TemplateMap, TemplateStore};
 
 /// A collection of templates backed by a `TemplateStore`
 #[derive(Debug, serde::Deserialize)]
@@ -19,6 +17,10 @@ where
     S: TemplateStore,
 {
     /// Create an empty collection with the store
+    ///
+    /// # Errors
+    /// - An I/O Error if the data was to be loaded from a non-existant file
+    /// - A deserialization error from the template source
     pub fn new(store: S) -> Result<Self, Error> {
         let mut this = Self {
             store,
@@ -37,25 +39,25 @@ where
     }
 
     /// Refreshes the collection from the backing store
+    ///
+    /// # Errors
+    /// - An I/O Error if the data was to be loaded from a non-existant file
+    /// - A deserialization error from the template source
     pub fn refresh(&mut self) -> Result<(), Error> {
         if self.store.changed() {
-            self.templates = parse_template_map(self.store.data()?)?;
+            self.templates = self.store.parse_map()?;
             log::debug!("refreshed templates");
         }
         Ok(())
     }
-}
 
-fn parse_template_map(input: String) -> Result<TemplateMap<String>, Error> {
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "serde_json")] {
-            serde_json::from_str(&input).map_err(|err| Error::Deserialize(err.into()))
-        }
-        else if #[cfg(feature = "toml")] {
-            toml::from_str(&input).map_err(|err| Error::Deserialize(err.into()))
-        }
-        else {
-            unreachable!()
-        }
+    /// Get a reference to the inner store
+    pub fn store(&self) -> &S {
+        &self.store
+    }
+
+    /// Get a mutable reference to the inner store
+    pub fn store_mut(&mut self) -> &mut S {
+        &mut self.store
     }
 }
