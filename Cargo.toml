@@ -1,0 +1,24 @@
+[package]
+name = "template"
+version = "0.1.0"
+authors = ["museun <museun@outlook.com>"]
+edition = "2018"
+license = "0BSD"
+repository = "https://github.com/museun/template"
+
+[dependencies]
+template_derive    = { path = "./template_derive", optional = true } 
+
+cfg-if             = { version = "0.1" }
+static_assertions  = { version = "1.1" }
+
+log                = { version = "0.4" }
+markings           = { version = "0.3" }
+
+serde              = { version = "1.0", features = ["derive"] }
+serde_json         = { version = "1.0", optional = true }
+toml               = { version = "0.5", optional = true }
+
+[features]
+default = ["toml"]
+derive  = ["template_derive"]
