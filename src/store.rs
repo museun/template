@@ -179,8 +179,16 @@ impl TemplateStore for MemoryStore {
     }
 }
 
+/// A store that always returns an error
 #[derive(Clone, Copy, Default, Debug)]
 pub struct NullStore {}
+
+impl NullStore {
+    /// Create a new NullStore
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
 impl TemplateStore for NullStore {
     fn parse_map(&mut self) -> Result<TemplateMap<String>, Error> {
