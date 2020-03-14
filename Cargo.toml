@@ -9,9 +9,9 @@ repository = "https://github.com/museun/template"
 [dependencies]
 template_derive    = { path = "./template_derive", optional = true } 
 
-cfg-if             = { version = "0.1"} 
-log                = { version = "0.4"} 
-markings           = { version = "0.3"} 
+cfg-if             = { version = "0.1" } 
+log                = { version = "0.4" } 
+markings           = { version = "0.3" } 
 
 serde              = { version = "1.0", features = ["derive"] }
 serde_json         = { version = "1.0", optional = true }

@@ -10,6 +10,7 @@ pub trait TemplateStore {
     /// # Errors
     /// - Any I/O error associated with fetching this data
     /// - Any deserialization error
+    // TODO make this return an Result<Status, Error>
     fn parse_map(&mut self) -> Result<TemplateMap<String>, Error>;
     /// Returns whether the template changed
     fn changed(&mut self) -> bool;
@@ -54,6 +55,7 @@ impl TemplateStore for FileStore {
             return true;
         }
 
+        // TODO clean this up (this breaks the Option<T: TemplateStore>)
         match std::fs::metadata(&self.file)
             .and_then(|md| md.modified())
             .ok()
@@ -200,7 +202,7 @@ pub struct NullStore {}
 
 impl NullStore {
     /// Create a new NullStore
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 }
@@ -234,7 +236,9 @@ where
     }
 
     fn changed(&mut self) -> bool {
-        self.as_mut().map(|s| s.changed()).unwrap_or(true)
+        // TODO make this do something
+        // self.as_mut().map(|s| s.changed()).unwrap_or(true)
+        true
     }
 }
 
