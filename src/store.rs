@@ -18,7 +18,7 @@ pub trait TemplateStore {
 /// A file-based backing for templates
 pub struct FileStore {
     file: PathBuf,
-    last: SystemTime,
+    last: Option<SystemTime>,
     loader: LoadFunction,
 }
 
@@ -37,7 +37,7 @@ impl FileStore {
     /// # Errors
     /// - File wasn't found / not readable
     pub fn new(file: PathBuf, loader: LoadFunction) -> Result<Self, Error> {
-        let last = std::fs::metadata(&file)?.modified()?;
+        let last = std::fs::metadata(&file)?.modified()?.into();
         Ok(Self { file, last, loader })
     }
 }
@@ -48,13 +48,24 @@ impl TemplateStore for FileStore {
     }
 
     fn changed(&mut self) -> bool {
+        if self.last.is_none() {
+            log::debug!("FileStore initial changed");
+            self.last.replace(std::time::SystemTime::now());
+            return true;
+        }
+
         match std::fs::metadata(&self.file)
             .and_then(|md| md.modified())
             .ok()
-            .filter(|&last| last > self.last)
-        {
+            .filter(|&last| {
+                if let Some(prev) = self.last {
+                    return last > prev;
+                }
+                true
+            }) {
             Some(time) => {
-                self.last = time;
+                log::debug!("FileStore changed");
+                self.last.replace(time);
                 true
             }
             None => false,
@@ -111,9 +122,13 @@ impl<D, P> PartialStore<D, P> {
 
 impl<D: TemplateStore, P: TemplateStore> TemplateStore for PartialStore<D, P> {
     fn parse_map(&mut self) -> Result<TemplateMap<String>, Error> {
-        self.partial
-            .parse_map()
-            .or_else(|_| self.default.parse_map())
+        let left = self.partial.parse_map().unwrap_or_default();
+        log::trace!("got: partial entries: {}", left.len());
+        let mut right = self.default.parse_map()?;
+        log::trace!("got: default entries: {}", left.len());
+        right.extend(left);
+        log::trace!("after merge: total: {}", right.len());
+        Ok(right)
     }
 
     fn changed(&mut self) -> bool {
@@ -219,7 +234,7 @@ where
     }
 
     fn changed(&mut self) -> bool {
-        self.as_mut().map(|s| s.changed()).unwrap_or_default()
+        self.as_mut().map(|s| s.changed()).unwrap_or(true)
     }
 }
 

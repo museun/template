@@ -5,11 +5,19 @@ use std::hash::Hash;
 use super::{Error, Mapping, TemplateMap, TemplateStore};
 
 /// A collection of templates backed by a `TemplateStore`
-#[derive(Debug, serde::Deserialize)]
+#[derive(serde::Deserialize)]
 pub struct Templates<S> {
     #[serde(skip)]
     store: S,
     templates: TemplateMap<String>,
+}
+
+impl<S> std::fmt::Debug for Templates<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Templates")
+            .field("map", &self.templates)
+            .finish()
+    }
 }
 
 impl<S> Templates<S>

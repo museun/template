@@ -76,10 +76,22 @@ impl<S: TemplateStore> Resolver<S> {
         Templates::new(store).map(|templates| Self { templates })
     }
 
-    /// Tries to get the template string for `namespace.name`
-    pub fn resolve(&mut self, namespace: &str, name: &str) -> Option<&String> {
-        self.templates.refresh().ok()?;
-        self.templates.get(namespace)?.get(name)
+    /// Tries to get the template string for `namespace.variant`
+    pub fn resolve(&mut self, namespace: &str, variant: &str) -> Option<&String> {
+        self.templates
+            .refresh()
+            .map_err(|err| {
+                log::warn!(
+                    "Cannot refresh templates ({}::{}): {}",
+                    namespace,
+                    variant,
+                    err
+                );
+                err
+            })
+            .ok()?;
+
+        self.templates.get(namespace)?.get(variant)
     }
 
     /// Get a reference to the inner store
@@ -90,6 +102,16 @@ impl<S: TemplateStore> Resolver<S> {
     /// Get a mutable reference to the inner store
     pub fn store_mut(&mut self) -> &mut S {
         self.templates.store_mut()
+    }
+
+    /// Get the templates
+    pub fn templates(&self) -> &Templates<S> {
+        &self.templates
+    }
+
+    /// Get the templates
+    pub fn templates_mut(&mut self) -> &mut Templates<S> {
+        &mut self.templates
     }
 }
 
