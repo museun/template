@@ -179,6 +179,22 @@ impl TemplateStore for MemoryStore {
     }
 }
 
+#[derive(Clone, Copy, Default, Debug)]
+pub struct NullStore {}
+
+impl TemplateStore for NullStore {
+    fn parse_map(&mut self) -> Result<TemplateMap<String>, Error> {
+        Err(Error::Io(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "NullStore will always be empty",
+        )))
+    }
+
+    fn changed(&mut self) -> bool {
+        false
+    }
+}
+
 impl<T> TemplateStore for Box<T>
 where
     T: TemplateStore + ?Sized,

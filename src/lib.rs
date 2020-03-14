@@ -26,7 +26,7 @@ mod error;
 pub use error::Error;
 
 mod store;
-pub use store::{FileStore, MemoryStore, PartialStore, TemplateStore};
+pub use store::{FileStore, MemoryStore, NullStore, PartialStore, TemplateStore};
 
 mod loader;
 pub use loader::*;

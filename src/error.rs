@@ -1,5 +1,6 @@
 /// Errors produced by this crate
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// An I/O error occurred
     Io(std::io::Error),
