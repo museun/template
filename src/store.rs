@@ -203,6 +203,26 @@ impl TemplateStore for NullStore {
     }
 }
 
+impl<T> TemplateStore for Option<T>
+where
+    T: TemplateStore,
+{
+    fn parse_map(&mut self) -> Result<TemplateMap<String>, Error> {
+        self.as_mut()
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "None store always returns an error",
+                )
+            })?
+            .parse_map()
+    }
+
+    fn changed(&mut self) -> bool {
+        self.as_mut().map(|s| s.changed()).unwrap_or_default()
+    }
+}
+
 impl<T> TemplateStore for Box<T>
 where
     T: TemplateStore + ?Sized,
