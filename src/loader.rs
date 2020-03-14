@@ -33,6 +33,6 @@ pub fn load_yaml(input: &str) -> Result<TemplateMap<String>, Error> {
 
 #[allow(dead_code)]
 #[cold]
-fn deser_err(err: impl std::error::Error + 'static) -> Error {
+fn deser_err(err: impl std::error::Error + Sync + Send + 'static) -> Error {
     Error::Deserialize(Box::new(err))
 }

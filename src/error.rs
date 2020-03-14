@@ -4,9 +4,9 @@ pub enum Error {
     /// An I/O error occurred
     Io(std::io::Error),
     /// Serialization error
-    Serialize(Box<dyn std::error::Error>),
+    Serialize(Box<dyn std::error::Error + Sync + Send>),
     /// Deserialization error
-    Deserialize(Box<dyn std::error::Error>),
+    Deserialize(Box<dyn std::error::Error + Sync + Send>),
 }
 
 impl From<std::io::Error> for Error {

@@ -181,6 +181,18 @@ impl TemplateStore for MemoryStore {
 
 impl<T> TemplateStore for Box<T>
 where
+    T: TemplateStore + ?Sized,
+{
+    fn parse_map(&mut self) -> Result<TemplateMap<String>, Error> {
+        <T as TemplateStore>::parse_map(&mut *self)
+    }
+    fn changed(&mut self) -> bool {
+        <T as TemplateStore>::changed(&mut *self)
+    }
+}
+
+impl<'a, T> TemplateStore for &'a mut T
+where
     T: TemplateStore,
 {
     fn parse_map(&mut self) -> Result<TemplateMap<String>, Error> {
