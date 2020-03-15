@@ -5,7 +5,7 @@ use syn::{parse_macro_input, DeriveInput};
 
 /** Derives `Template` for an enum
 
-    * the type must be an enum with named variants
+    * the type must be an enum with named variants, or fieldless variants
     * the fields in the named variants must not be rust identifiers
     * the types in the named variants must implement `std::fmt::Display`
 */

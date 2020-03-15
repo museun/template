@@ -34,23 +34,88 @@ pub use loader::*;
 /// A template mapping of `T` to `Mapping<T>`
 pub type TemplateMap<T> = std::collections::HashMap<T, Mapping<T>>;
 
-cfg_if::cfg_if! {
-    if #[cfg(feature = "derive")] {
-        #[allow(unused_imports)]
-        #[macro_use]
-        extern crate template_derive;
-        #[doc(inline)]
-        pub use template_derive::*;
-    }
+#[cfg(feature = "derive")]
+#[allow(unused_imports)]
+#[cfg(feature = "derive")]
+extern crate template_derive;
+
+#[cfg(feature = "derive")]
+#[doc(inline)]
+pub use template_derive::*;
+
+/**
+Template for applying a templated string to an enum variant
+
+# Example using the derive feature
+```rust,ignore
+use template::Template;
+// first, derive Template
+#[derive(Template, Debug)]
+// then add a namespace, this it the 'section' (or 'object') containing each template for this type
+#[namespace("response")]
+enum MyResponse<'a> {
+    // each field is an entry under the namespace
+    Hello {
+        // and each named field is the variable in the template
+        name: &'a str,
+    },
+    CountItems { count: usize },
+    // fieldless variants don't have variables
+    Okay,
 }
 
-/// Template for applying a templated string to an enum variant
+let hello = MyResponse::Hello { name: "world" };
+let count = MyResponse::CountItems { count: 42 };
+let okay = MyResponse::Okay;
+
+assert_eq!(MyResponse::namespace(), "response");
+// snake_case of the enum
+assert_eq!(MyResponse::name(), "my_response");
+
+// snake_case of variant
+assert_eq!(hello.variant(), "hello");
+assert_eq!(count.variant(), "count_items");
+assert_eq!(okay.variant(), "okay");
+
+assert_eq!(hello.apply("hello ${name}!").unwrap(), "hello world!");
+assert_eq!(count.apply("count is: ${count}").unwrap(), "count is: 42");
+assert_eq!(okay.apply("okay response").unwrap(), "okay response");
+```
+
+## Example of how you could store the templates in textual form:
+### TOML
+```toml
+[response]                         # namespace
+hello       = "hello ${name}!"     # Hello { name: &str }
+count_items = "count is: ${count}" # CountItems { count: usize }
+okay        = "okay response"      # Okay
+```
+
+### JSON
+```json
+{
+    "response": {
+        "hello": "hello ${name}!",
+        "count_items": "count is: ${count}",
+        "okay": "okay response"
+    }
+}
+```
+
+### YAML
+```yaml
+response:
+  hello: hello ${name}!
+  count_items: 'count is: ${count}'
+  okay: okay response
+```
+*/
 pub trait Template {
     /// Namespace of the template
     fn namespace() -> &'static str;
-    /// Name of the template
+    /// Name of the template (the enum's name, in _snake_case_)
     fn name() -> &'static str;
-    /// Name of the specific variant
+    /// Name of the specific variant (in _snake_case_)
     fn variant(&self) -> &'static str;
     /// Apply this template string to this variant
     fn apply(&self, input: &str) -> Option<String>;
@@ -58,7 +123,7 @@ pub trait Template {
 
 /// A Template Resolver
 ///
-/// Provides a simple way to always get the latest template string for a `namespace.name`
+/// Provides a simple way to always get the latest template string for a `namespace.variant`
 #[derive(Debug)]
 pub struct Resolver<S>
 where

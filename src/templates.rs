@@ -24,7 +24,7 @@ impl<S> Templates<S>
 where
     S: TemplateStore,
 {
-    /// Create an empty collection with the store
+    /// Create and initializations a collection with a store
     ///
     /// # Errors
     /// - An I/O Error if the data was to be loaded from a non-existant file
@@ -37,7 +37,9 @@ where
         this.refresh().map(|_| this)
     }
 
-    /// Tries to get the key from the collection
+    /// Tries to get the key (`namespace`) from the collection
+    ///
+    /// The returned value will let you get the value (`variant`).
     pub fn get<K: ?Sized>(&mut self, parent: &K) -> Option<&Mapping<String>>
     where
         K: Hash + Eq + Display,
@@ -67,5 +69,10 @@ where
     /// Get a mutable reference to the inner store
     pub fn store_mut(&mut self) -> &mut S {
         &mut self.store
+    }
+
+    /// Consume this returning the inner store
+    pub fn into_inner(self) -> S {
+        self.store
     }
 }
