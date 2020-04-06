@@ -38,8 +38,11 @@ impl FileStore {
     /// # Errors
     /// - File wasn't found / not readable
     pub fn new(file: PathBuf, loader: LoadFunction) -> Result<Self, Error> {
-        let last = std::fs::metadata(&file)?.modified()?.into();
-        Ok(Self { file, last, loader })
+        Ok(Self {
+            file,
+            last: None,
+            loader,
+        })
     }
 }
 
