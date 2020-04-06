@@ -112,13 +112,29 @@ response:
 */
 pub trait Template {
     /// Namespace of the template
-    fn namespace() -> &'static str;
-    /// Name of the template (the enum's name, in _snake_case_)
-    fn name() -> &'static str;
-    /// Name of the specific variant (in _snake_case_)
-    fn variant(&self) -> &'static str;
+    fn namespace(casing: NameCasing) -> &'static str;
+    /// Name of the template (the enum's name)
+    fn name(casing: NameCasing) -> &'static str;
+    /// Name of the specific variant
+    fn variant(&self, casing: NameCasing) -> &'static str;
     /// Apply this template string to this variant
     fn apply(&self, input: &str) -> Option<String>;
+}
+
+/// The casing to get for the Templates parsed state
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
+#[non_exhaustive]
+pub enum NameCasing {
+    /// Snake case (default)
+    Snake,
+    /// The origianl parsed case
+    Original,
+}
+
+impl Default for NameCasing {
+    fn default() -> Self {
+        Self::Snake
+    }
 }
 
 /// A Template Resolver

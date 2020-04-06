@@ -1,7 +1,7 @@
 use heck::SnekCase as _;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Error};
 
 /** Derives `Template` for an enum
 
@@ -20,17 +20,24 @@ pub fn template(input: TokenStream) -> TokenStream {
         ..
     } = derive_input;
 
-    if attrs.len() != 1 {
-        panic!("a namespace attribute with name must be supplied")
+    if attrs.is_empty() {
+        let mut err = Error::new_spanned(
+            quote! { attrs},
+            "A `namespace` attribute with the template name must be supplied.",
+        );
+        err.combine(Error::new_spanned(ident, "for this type"));
+        return err.to_compile_error().into();
     }
-    let namespace = match attrs.remove(0).parse_args::<syn::Lit>() {
-        Ok(syn::Lit::Str(namespace)) => namespace.value(),
-        _ => panic!("a string must be used as a namespace identifier"),
+
+    let attr = attrs.remove(0);
+    let namespace = match find_namespace(&attr) {
+        Ok(namespace) => namespace.value(),
+        Err(err) => return err.to_compile_error().into(),
     };
 
-    let variants = match data {
-        syn::Data::Enum(e) => get_variants(e.variants.into_iter()).collect::<Vec<_>>(),
-        _ => panic!("only enums are allowed"),
+    let variants = match build_variant_map(data, attr) {
+        Ok(variants) => variants,
+        Err(err) => return err.to_compile_error().into(),
     };
 
     let matches = variants.clone().into_iter()
@@ -41,7 +48,7 @@ pub fn template(input: TokenStream) -> TokenStream {
                 quote! { with(#k, #v) }
             });
             quote! {
-                #var { #(#fields),* } => {
+                #ident::#var { #(#fields),* } => {
                     let args = markings::Args::new()#(.#args)*.build();
                     let opts = markings::Opts::default().optional_keys().duplicate_keys().empty_template().build();
                     let template = markings::Template::parse(template, opts).ok()?;
@@ -50,50 +57,139 @@ pub fn template(input: TokenStream) -> TokenStream {
             }
         });
 
-    let names = variants.into_iter().map(|(var, _)| {
-        let name = var.to_string().to_snek_case();
-        quote! { #var { .. } => #name }
+    let names_original = variants.iter().map(|(var, _)| {
+        let name = var.to_string();
+        quote! { #ident::#var { .. } => #name }
     });
-    let name = ident.to_string().to_snek_case();
-    let namespace = namespace.to_snek_case();
+
+    let names = variants.iter().map(|(var, _)| {
+        let name = var.to_string().to_snek_case();
+        quote! { #ident::#var { .. } => #name }
+    });
+
+    let name_original = ident.to_string();
+    let name = name_original.to_snek_case();
+
+    let namespace_original = namespace;
+    let namespace = namespace_original.to_snek_case();
 
     let ast = quote! {
-        impl #generics Template for #ident #generics {
-            fn namespace() -> &'static str { #namespace }
+        impl #generics template::Template for #ident #generics {
+            fn namespace(casing: template::NameCasing) -> &'static str {
+                match casing {
+                    template::NameCasing::Snake => { #namespace }
+                    template::NameCasing::Original => { #namespace_original }
+                    _ => unimplemented!()
+                }
+            }
 
-            fn name() -> &'static str { #name }
+            fn name(casing: template::NameCasing) -> &'static str {
+                match casing {
+                    template::NameCasing::Snake => { #name }
+                    template::NameCasing::Original => { #name_original }
+                    _ => unimplemented!()
+                }
+            }
 
-            fn variant(&self) -> &'static str {
-                use #ident::*;
-                match self {
-                    #(#names),*
+            fn variant(&self,casing: template::NameCasing) -> &'static str {
+                match casing {
+                    template::NameCasing::Snake => { match self { #(#names),* } }
+                    template::NameCasing::Original => { match self { #(#names_original),* } }
+                    _ => unimplemented!()
                 }
             }
 
             fn apply(&self, template: &str) -> Option<String> {
-                use #ident::*;
-                match self {
-                    #(#matches),*
-                }
+                match self { #(#matches),* }
             }
         }
     };
     ast.into()
 }
 
-fn get_variants(
-    variants: impl Iterator<Item = syn::Variant>,
-) -> impl Iterator<Item = (syn::Ident, Vec<syn::Field>)> {
-    variants.map(|var| {
-        let ident = var.ident;
-        let fields = match var.fields {
-            syn::Fields::Named(fields) => fields,
-            syn::Fields::Unit => return (ident, vec![]),
-            _ => panic!("only named fields are allowed"),
-        };
-        if fields.named.is_empty() {
-            panic!("named variants must have fields")
+fn find_namespace(attr: &syn::Attribute) -> Result<syn::LitStr, syn::Error> {
+    let ns = match attr.parse_args::<syn::Lit>() {
+        Ok(syn::Lit::Str(namespace)) => namespace,
+        Ok(attr) => {
+            return Err(Error::new(
+                attr.span(), //
+                "A string literal must be used as a `namespace` identifier.",
+            ));
         }
-        (ident, fields.named.into_iter().collect())
-    })
+        // TODO say we cannot parse the name into a Lit (when can this happen?)
+        Err(err) => return Err(Error::new(attr.span(), err)),
+    };
+
+    let namespace = ns.value();
+
+    if namespace.chars().take_while(|c| !c.is_alphabetic()).count() > 0 {
+        return Err(Error::new(
+            ns.span(),
+            "The namespace must start with a character.",
+        ));
+    }
+
+    if !namespace
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        return Err(Error::new(
+            ns.span(),
+            "The namespace should be of [A..Z, _, 1..9]",
+        ));
+    }
+
+    if namespace.chars().any(|c| c.is_whitespace()) {
+        return Err(Error::new(
+            ns.span(),
+            "The namespace cannot contain spaces.",
+        ));
+    }
+
+    Ok(ns)
+}
+
+fn build_variant_map(
+    data: syn::Data,
+    attr: syn::Attribute,
+) -> Result<Vec<(syn::Ident, Vec<syn::Field>)>, syn::Error> {
+    let variants = match data {
+        syn::Data::Enum(e) if !e.variants.is_empty() => e.variants,
+        syn::Data::Enum(e) => {
+            return Err(Error::new(
+                e.brace_token.span,
+                "Atleast one variant must be supplied",
+            ))
+        }
+        _ => return Err(Error::new(attr.span(), "Only enums are allowed.")),
+    };
+
+    let mut results = vec![];
+    for variant in variants {
+        let ident = variant.ident;
+        let fields = match variant.fields {
+            syn::Fields::Named(fields) => fields,
+            syn::Fields::Unit => {
+                results.push((ident, vec![]));
+                continue;
+            }
+            field => {
+                return Err(Error::new(
+                    field.span(), //
+                    "Only named fields are allowed.",
+                ));
+            }
+        };
+
+        if fields.named.is_empty() {
+            return Err(Error::new(
+                fields.named.span(), //
+                "Named variants must have fields.",
+            ));
+        }
+
+        results.push((ident, fields.named.into_iter().collect()));
+    }
+
+    Ok(results)
 }
