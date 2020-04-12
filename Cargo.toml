@@ -10,7 +10,7 @@ repository = "https://github.com/museun/template"
 template_derive = { path = "./template_derive", optional = true }
 
 log      = "0.4"
-markings = "0.3"
+markings = "0.4"
 
 serde      = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", optional = true }

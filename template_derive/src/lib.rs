@@ -49,9 +49,9 @@ pub fn template(input: TokenStream) -> TokenStream {
             });
             quote! {
                 #ident::#var { #(#fields),* } => {
-                    let args = markings::Args::new()#(.#args)*.build();
-                    let opts = markings::Opts::default().optional_keys().duplicate_keys().empty_template().build();
-                    let template = markings::Template::parse(template, opts).ok()?;
+                    let args = template::markings::Args::new()#(.#args)*;
+                    let opts = template::markings::Opts::default().optional_keys().duplicate_keys().empty_template().build();
+                    let template = template::markings::Template::parse(template, opts).ok()?;
                     template.apply(&args).ok()
                 }
             }
